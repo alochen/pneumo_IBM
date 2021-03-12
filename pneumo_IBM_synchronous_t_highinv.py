@@ -2,6 +2,7 @@
 ########## time step, and a migration rate such that when a serotype goes extinct, it is reseeded into the     ############
 ########## population in the form of one infectious carrier                                                    ############
 
+#import os
 import pandas as pd
 import numpy as np
 import math
@@ -9,17 +10,17 @@ import random
 import time
 import glob
 import os
-#from multiprocessing import Pool
 #import matplotlib
 #import matplotlib.pyplot as plt
 
 #os.getcwd()
 #os.chdir('Q:\\Technical\\Python')
-country = "fra"
-indivs = 1000 #50000
+country = "fi"
+globalinv = False
 phase = 'prevacc'
+indivs = 1000
 
-filedest = "//qdrive/homes/al817/Technical/Python/1000popruns/" + country + '_dis/'
+filedest = "//qdrive/homes/al817/Technical/Python/1000popruns/" + country + '_' + globalinv*("glob") + "inv/" 
 
 seroparams = pd.read_csv(r"//qdrive.dide.ic.ac.uk/homes/al817/Technical/Python/seroparams.csv")
 seroparams = seroparams.drop(seroparams.index[seroparams.serotype.isin(['15B/C_old','15B','15C'])]).reset_index()
@@ -31,9 +32,76 @@ filenums = [item.split('_',1)[0] for item in mylist]
 filenums = [item.split('simulation',1)[-1] for item in filenums]
 filenums = [int(i) for i in filenums] 
 simnum = max(filenums) + 1
-#simnum = str(simnum) + '_50kpop'
-endstring = "simulation" + str(simnum) + "_dis_" + phase + "_" + country + "_"
+simnum = str(simnum) + '_' + globalinv*("glob") + "inv" 
+endstring = "simulation" + str(simnum) + "_" + phase + "_" + country + "_"
 seroparams.to_csv(path_or_buf = filedest + endstring + 'dummy.csv', index = False)
+
+#################################################################################################################################################################
+############# Invasive serotypes ################################################################################################################################
+#################################################################################################################################################################
+
+inv = pd.read_csv(r"//qdrive/homes/al817/Technical/R/Case-to-carrier/abs.child-new.csv")
+
+finland_inv = inv.loc[np.where(inv.DS == 'Finland.pre.PCV')[0]]
+usa_inv = inv.loc[np.where(inv.DS == 'Massachusetts.post.PCV7')[0]]  
+fra_inv = inv.loc[np.where(inv.DS == 'France.post.PCV7')[0]] 
+
+if country == "usa":
+    country_inv = usa_inv
+if country == "fi":
+    country_inv = finland_inv
+else:
+    country_inv = fra_inv
+
+country_inv = country_inv.drop(['Unnamed: 0', 'DS', 'Serogroup', 'carriage', 'disease', 
+                                'n.swab', 'N', 'time.int', 'lambda', 'lambda.low', 'lambda.high', 
+                                'carr.prev', 'carr.prev.low', 'carr.prev.high', 'agegrp'], axis = 1)
+
+global_inv = pd.read_csv(r"//qdrive/homes/al817/Technical/R/Case-to-carrier/consol.child-new.csv")
+global_inv = global_inv.drop(['Unnamed: 0', 'Serogroup'], axis = 1)
+global_inv.columns = country_inv.columns
+
+sero_nocountryinv = np.setdiff1d(colnames,country_inv.Serotype)
+
+sero_globalinvadd = sero_nocountryinv[pd.Series(sero_nocountryinv).isin(global_inv.Serotype)]
+country_inv = country_inv.append(global_inv.loc[np.where(global_inv.Serotype.isin(sero_globalinvadd))]).reset_index().drop(['index'],axis = 1)
+
+sero_nocountryinv2 = np.setdiff1d(colnames,country_inv.Serotype)
+
+setinv = np.array([0.0001, 0, 0.0001]) # inv for serotypes without inv estimate
+setinvdf = pd.DataFrame(np.tile(setinv, (len(sero_nocountryinv2),1)), columns = country_inv.columns[1:])
+setinvdf['Serotype'] = sero_nocountryinv2
+
+country_inv = country_inv.append(setinvdf).reset_index().drop(['index'],axis = 1)
+country_inv.iloc[np.where(country_inv.Serotype == 'NT')[0], 1:4] = 0
+
+serotypesnotincarrdat = np.setdiff1d(country_inv.Serotype, colnames)
+country_inv = country_inv.drop(np.where(country_inv.Serotype.isin(serotypesnotincarrdat))[0])
+
+# top 13 serotypes get vaccinated against
+top13 = np.array(country_inv.invasiveness)[np.argsort(country_inv.invasiveness)][-13:]
+vt = np.array(country_inv.Serotype)[np.argsort(country_inv.invasiveness)][-13:]
+vt_ind = np.where(np.isin(colnames, vt))[0]
+
+# top 13 invasive serotypes get vaccinated against
+top7add = np.array(country_inv.invasiveness)[np.argsort(country_inv.invasiveness)][-20:-13]
+new_vt = np.array(country_inv.Serotype)[np.argsort(country_inv.invasiveness)][-20:-13]
+new_vt_ind = np.where(np.isin(colnames, new_vt))[0]
+
+# top 13 globally invasive serotypes get vaccinated against
+if globalinv == True:
+    top13 = np.array(global_inv.invasiveness)[np.argsort(global_inv.invasiveness)][-13:]
+    vt = np.array(global_inv.Serotype)[np.argsort(global_inv.invasiveness)][-13:]
+    vt_ind = np.where(np.isin(colnames, vt))[0]
+    top7add = np.array(global_inv.invasiveness)[np.argsort(global_inv.invasiveness)][-20:-13]
+    new_vt = np.array(global_inv.Serotype)[np.argsort(global_inv.invasiveness)][-20:-13]
+    new_vt_ind = np.where(np.isin(colnames, new_vt))[0]
+    
+# print VT into dataframe
+vt_csv =  filedest + endstring + "VTsero" + ".csv"
+d = dict(vt_1 = vt, vt_2 = new_vt)  
+vtdf = pd.DataFrame(dict([(k,pd.Series(v)) for k,v in d.items() ])) 
+vtdf.to_csv(path_or_buf = vt_csv, index = False)
 
 #################################################################################################################################################################
 ############# PART 1: PRE-VACCINATION PERIOD ####################################################################################################################
@@ -47,9 +115,6 @@ def new_lambdas(carrier_person, ind_lambdas, prev_col, sigma):
     index = np.where(carrier_person[0:num_sero] == 0) # index of serotypes not carried
     non_index = np.bool_(carrier_person[0:num_sero]) # index of serotypes carried
     
-    # vt_ind commented out for no vaccination
-    #vt_ind = index[0][np.isin(carrier_person.index[index], vt)] # index of VT serotypes not carried 
-    
     # draw from distribution of parameters with mean @ max likelihood
     eps = epsilon#np.random.normal(epsilon)
     thet = theta#np.random.normal(theta)
@@ -61,19 +126,13 @@ def new_lambdas(carrier_person, ind_lambdas, prev_col, sigma):
     # otherwise, your FOI changes based on your colonization history and competition    
     else:
         ind_lambdas[index[0]] = (1-(sig*(prev_col[index[0]] > 0)))*ind_lambdas[index[0]]*(1-thet*(susc < max_carr_cap))   
-        
-    # if individual is vaccinated, VT not carried have rate = 1/vacc_dur, overwrites ind_lambdas = 0 from previous step
-    #if vacc == True:
-    #    ind_lambdas[vt_ind] = 1/vacc_dur
-    
+
     # serotypes you are carrying change recovery rate based on colonization history and immunity
     ind_lambdas[non_index] = 1/(mincarrdur+(((1/ind_lambdas[non_index])-mincarrdur)*math.exp(-eps*sum(prev_col))))
     return(ind_lambdas)
 
 # import fitted carriage duration params from IBM_paramfitting.py
-
 # Initialise population
-
 num_sero = len(np.unique(seroparams['serotype']))
 max_carr_cap = 1
 pop_breakdown = [0.2, 0.6, 0.2] # has to sum to 1
@@ -182,8 +241,9 @@ plotsy.insert(loc = 0, column = 'time', value = np.nan)
     
 next_ev = 1
 start = time.time()
-#while t <= stop_t and tot_lambda1 != 0:
+
 for t in range(stop_t+1):
+#while t <= stop_t and tot_lambda1 != 0:
     
     if len(np.where(carriers.age > 36500)[0]) > 0:
         ind_to_die = np.where(carriers.age > 36500)[0]
@@ -209,6 +269,13 @@ for t in range(stop_t+1):
     #if t > 9000: 100 # only record after 100th day
     plotsy.iloc[next_ev-1, 1:] = np.array(carriers.iloc[:,0:num_sero].sum(axis = 0))
     plotsy.time[next_ev-1] = t
+    
+    # turn on vaccination after 20 years SS
+#     if t >= 7300:
+#         index_vacc = np.where((carriers.age >= 730) & (carriers.age <= 1095) & (carriers.vacc == False)) # index of ppl to be vaccinated
+#         num_newvacc = round(vacc_eff*len(index_vacc[0])) # number of new people to vaccinate (= vacc efficacy * tot number of people)
+#         adjusted_ind = index_vacc[0][0:num_newvacc] # indices of people for whom vaccination works/is protective
+#         carriers.loc[adjusted_ind, 'vacc'] = True
         
     # migration: add 1 carrier to serotypes with zero carriers
     extinctsero_child = np.where(carriers.iloc[index_children,0:num_sero].sum(axis = 0) == 0)[0]
@@ -241,9 +308,9 @@ for t in range(stop_t+1):
     totFOIbysero = np.row_stack((totFOIbysero_children, totFOIbysero_adults, totFOIbysero_elders))
     
     if np.any(totFOIbysero < 0):
-        print('NEGATIVE FOI')
-        print("sero:", seroparams.serotype[np.where(totFOIbysero < 0)[1]])
-        print("indiv:", np.where(carriers_all[seroparams.serotype[np.where(totFOIbysero < 0)[1]]] > 0))
+            print('NEGATIVE FOI')
+            print("sero:", seroparams.serotype[np.where(totFOIbysero < 0)[1]])
+            print("indiv:", np.where(carriers_all[seroparams.serotype[np.where(totFOIbysero < 0)[1]]] > 0))
     
     # individual rates                
     for s in range(indivs):
@@ -254,90 +321,25 @@ for t in range(stop_t+1):
             B = seroparams['B_emcee'][j]
             # if person not carrying
             if carriers.iloc[s,j] == 0:
-                # if person is vaccinated & serotype is VT
-                if carriers.vacc[s] == True and np.isin(j,vt_ind):
-                    ind_lambdas.iloc[s,j] = 1/vacc_dur
                 # if serotype is NVT or if person is not vaccinated
-                else:
-                    ind_lambdas.iloc[s,j] = totFOIbysero[carriers['agegroup'][s],j]
+                ind_lambdas.iloc[s,j] = totFOIbysero[carriers['agegroup'][s],j]
             # if person is carrying, then recovery rate as function of prevcol
             else:
                 ind_lambdas.iloc[s,j] = (1/np.random.gamma(shape = alpha, scale = (A*np.exp(-prevcol*B))/alpha))                
     
     # tot.lambda = total rate of all/any events
     numindivspertime = round(indivs/50)
-    #i = list(range(numindivspertime))#0
+    i = 0
     U0 = np.random.uniform(0,1, size = numindivspertime)#20)
     U3 = np.random.uniform(0,1, size = numindivspertime)#20)
     
-
-    # testing multiprocessing TBDDDDDD
-#     
-#     def process_updateindivs(i):
-#         
-#         # stackexchange example
-#         #sci=fits.open('{}.fits'.format(name))
-#         #<process>
-#         
-#         tot_lambda1 = ind_lambdas.sum().sum()
-#         #print(tot_lambda1)
-#         U1 = U0[{}.format(i)]
-#         U1_tot_lambda1 = U1*tot_lambda1
-#         
-#         # choose person index ( = which person will this happen to?)
-#         cumsum_person = ind_lambdas.sum(axis = 1)
-#         which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
-#         #try:
-#         #    which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
-#         #except IndexError:
-#         #    which_person = np.where(np.random.uniform(0,1)*ind_lambdas.sum().sum() < np.cumsum(cumsum_person))[0][0]#which_person = indivs - 1 #
-#         #    break
-#         #print(which_person)
-#         
-#         # choose event that will take place (= which serotype will be toggled?)
-#         person_lambdas = new_lambdas(carriers.loc[which_person], ind_lambdas.loc[which_person], prev_col.loc[which_person], sigma)
-#             
-#         if np.any(person_lambdas < 0):
-#             print('NEGATIVE IND_LAMBDA')
-#             print("indiv:", which_person)
-#             print("carr status:", carriers.iloc[which_person, np.where(person_lambdas < 0)[0][0]])
-#             print("serotype:", colnames[np.where(person_lambdas < 0)])
-#             print("prevcol:",prev_col.iloc[which_person, np.where(person_lambdas < 0)[0][0]])
-#             #break
-#         tot_lambda2 = sum(person_lambdas)
-#         U2 = U3[{}.format(i)]
-#         U2_tot_lambda2 = U2*tot_lambda2
-# 
-#         which_indices = np.where(U2_tot_lambda2 < np.cumsum(person_lambdas))
-#         
-#         # switching event (S --> I or I --> S)
-#         if which_indices[0].size > 0:
-#             which_sero = which_indices[0][0]
-#             carriers.iloc[which_person, which_sero] = ~carriers.iloc[which_person, which_sero] + 2        
-# 
-#         #print(which_sero)
-#         # reupdate the susc score
-#         new_susc = max_carr_cap - sum(carriers.iloc[which_person, 0:num_sero])
-#     
-#         # update colonisation history if person acquired new serotype unless person is elderly  
-#         if (new_susc < carriers.susc.loc[which_person]) & (carriers.age.loc[which_person] <= 23360): 
-#             prev_col.iloc[which_person, which_sero] = prev_col.iloc[which_person, which_sero] + 1
-#             
-#         carriers.loc[carriers.index == which_person,'susc'] = new_susc
-#         
-#         #<process>
-#         
-#     if __name__ == '__main__':
-#         pool = Pool()                         # Create a multiprocessing Pool
-#         pool.map(process_updateindivs, i)  # process data_inputs iterable with pool
-
-    for i in range(numindivspertime):
     #while i < numindivspertime: # update 20 individuals each time step for indivs = 1000
+    for i in range(numindivspertime):
         tot_lambda1 = ind_lambdas.sum().sum()
         #print(tot_lambda1)
         U1 = U0[i]
         U1_tot_lambda1 = U1*tot_lambda1
-         
+        
         # choose person index ( = which person will this happen to?)
         cumsum_person = ind_lambdas.sum(axis = 1)
         which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
@@ -347,10 +349,10 @@ for t in range(stop_t+1):
         #    which_person = np.where(np.random.uniform(0,1)*ind_lambdas.sum().sum() < np.cumsum(cumsum_person))[0][0]#which_person = indivs - 1 #
         #    break
         #print(which_person)
-         
+        
         # choose event that will take place (= which serotype will be toggled?)
         person_lambdas = new_lambdas(carriers.loc[which_person], ind_lambdas.loc[which_person], prev_col.loc[which_person], sigma)
-             
+            
         if np.any(person_lambdas < 0):
             print('NEGATIVE IND_LAMBDA')
             print("indiv:", which_person)
@@ -361,22 +363,22 @@ for t in range(stop_t+1):
         tot_lambda2 = sum(person_lambdas)
         U2 = U3[i]
         U2_tot_lambda2 = U2*tot_lambda2
- 
+
         which_indices = np.where(U2_tot_lambda2 < np.cumsum(person_lambdas))
-         
+        
         # switching event (S --> I or I --> S)
         if which_indices[0].size > 0:
             which_sero = which_indices[0][0]
-            carriers.iloc[which_person, which_sero] = ~carriers.iloc[which_person, which_sero] + 2        
- 
+            carriers.iloc[which_person, which_sero] = ~carriers.iloc[which_person, which_sero] + 2    
+
         #print(which_sero)
         # reupdate the susc score
         new_susc = max_carr_cap - sum(carriers.iloc[which_person, 0:num_sero])
-     
+    
         # update colonisation history if person acquired new serotype unless person is elderly  
         if (new_susc < carriers.susc.loc[which_person]) & (carriers.age.loc[which_person] <= 23360): 
             prev_col.iloc[which_person, which_sero] = prev_col.iloc[which_person, which_sero] + 1
-             
+            
         carriers.loc[carriers.index == which_person,'susc'] = new_susc
         #i += 1
 
@@ -395,20 +397,75 @@ plot = plotsy_melt.pivot_table('value', 'time', 'variable', aggfunc='mean').plot
 sim_output = plotsy.loc[len(plotsy) - 1]
 sim_output['sim_time'] = total_time/3600
 
-newfiledest = filedest + endstring + "output" + ".csv"
+newfiledest = filedest + endstring +  "output" +".csv"
 sim_output.to_csv(path_or_buf= newfiledest, index = True)
 
 # prevcol
-prevcolnam = filedest + endstring + "prevcol" + ".csv"
+prevcolnam = filedest +  endstring + "prevcol" +".csv"
 prev_col.to_csv(path_or_buf = prevcolnam, index = True)
 
 # carriers
-carrnam =  filedest + endstring + "carrierstmax" + ".csv"
+carrnam =  filedest + endstring + "carrierstmax" +".csv"
 carriers.to_csv(path_or_buf = carrnam, index = True)
 
 # output figure
 plotname = filedest + endstring + "simulation" + ".pdf"
 plot.get_figure().savefig(plotname, bbox_inches = "tight")
+
+sim_output = pd.DataFrame({'key':sim_output.index, 'value':sim_output.values})
+seroprev = sim_output.drop([0, num_sero+1])
+seroprev = seroprev.rename(columns = {'key': 'Serotype', 'value': 'carrprev'})
+seroprev['carrprev'] = seroprev['carrprev']/indivs
+
+### DISEASE INCIDENCE USING INVASIVENESS
+disinc = seroprev.merge(country_inv, on = 'Serotype')
+disease_cas = disinc['carrprev']*disinc['invasiveness']*indivs*(t/365)
+disinc['disease'] = disease_cas/100000
+
+# Disease Incidence
+index_children = np.where(carriers.age <= 6205)[0]
+index_adults = np.where((carriers.age > 6205) & (carriers.age <= 23360))[0]
+index_elderly = np.where(carriers.age > 23360)[0]
+
+pop_child = len(index_children)
+pop_adult = len(index_adults)
+pop_elder = len(index_elderly)
+
+# Carriage by serotype
+carrprevchildsero = np.array(carriers[agegroup == 0].iloc[:,0:num_sero].sum(axis = 0))/pop_child
+carrprevadultsero = np.array(carriers[agegroup == 1].iloc[:,0:num_sero].sum(axis = 0))/pop_adult
+carrpreveldersero = np.array(carriers[agegroup == 2].iloc[:,0:num_sero].sum(axis = 0))/pop_elder
+
+disinc['carrprevchild'] = carrprevchildsero
+disinc['carrprevadult'] = carrprevadultsero
+disinc['carrprevelder'] = carrpreveldersero
+
+# disease cases by serotype
+disease_child = round(disinc['carrprevchild']*disinc['invasiveness']*(t/365)*pop_child)
+disease_adult = round(disinc['carrprevadult']*disinc['invasiveness']*(t/365)*pop_adult)
+disease_elder = round(disinc['carrprevelder']*disinc['invasiveness']*(t/365)*pop_elder)
+
+# save to file destination:
+newfiledest = filedest + endstring + "disinc" + ".csv"
+disinc.to_csv(path_or_buf= newfiledest, index = True)
+
+# overall IPD incidence by age group
+overalldischild = sum(disease_child)/(pop_child*(t/365))*100000
+overalldisadult = sum(disease_adult)/(pop_adult*(t/365))*100000
+overalldiselder = sum(disease_elder)/(pop_elder*(t/365))*100000
+
+# overall carr prev by age group
+overallcarrprevchild = carriers[agegroup == 0].iloc[:,0:num_sero].sum().sum()/pop_child #.605
+overallcarrprevadult = carriers[agegroup == 1].iloc[:,0:num_sero].sum().sum()/pop_adult #.607
+overallcarrprevelder = carriers[agegroup == 2].iloc[:,0:num_sero].sum().sum()/pop_elder #.5
+
+agegrpstats = np.array([[overallcarrprevchild, overallcarrprevadult, overallcarrprevelder],
+                        [overalldischild, overalldisadult, overalldiselder]])
+
+agegrpstats = pd.DataFrame(agegrpstats, columns = ['child', 'adult', 'elder'], index = ['carrprev', 'disease inc'])
+
+newfiledest = filedest + endstring + "agegrpstats" + ".csv"
+agegrpstats.to_csv(path_or_buf= newfiledest, index = True)
 
 #################################################################################################################################################################
 ############# PART 2: POST-VACCINATION PERIOD 1 #################################################################################################################
@@ -443,106 +500,6 @@ def new_lambdas2(carrier_person, ind_lambdas, prev_col, sigma):
     return(ind_lambdas)
 
 
-### Get invasiveness of serotypes
-
-inv = pd.read_csv(r"//qdrive/homes/al817/Technical/R/Case-to-carrier/abs.child-new.csv")
-finland_inv = inv.loc[np.where(inv.DS == 'Finland.pre.PCV')[0]]
-usa_inv = inv.loc[np.where(inv.DS == 'Massachusetts.post.PCV7')[0]]  
-fra_inv = inv.loc[np.where(inv.DS == 'France.post.PCV7')[0]] 
-
-if country == "usa":
-    country_inv = usa_inv
-if country == "fi":
-    country_inv = finland_inv
-else:
-    country_inv = fra_inv
-
-country_inv = country_inv.drop(['Unnamed: 0', 'DS', 'Serogroup', 'carriage', 'disease', 
-                                'n.swab', 'N', 'time.int', 'lambda', 'lambda.low', 'lambda.high', 
-                                'carr.prev', 'carr.prev.low', 'carr.prev.high', 'agegrp'], axis = 1)
-
-global_inv = pd.read_csv(r"//qdrive/homes/al817/Technical/R/Case-to-carrier/consol.child-new.csv")
-global_inv = global_inv.drop(['Unnamed: 0', 'Serogroup'], axis = 1)
-global_inv.columns = country_inv.columns
-
-# serotypes without local inv get global inv appended
-sero_nocountryinv = np.setdiff1d(colnames,country_inv.Serotype)
-sero_globalinvadd = sero_nocountryinv[pd.Series(sero_nocountryinv).isin(global_inv.Serotype)]
-country_inv = country_inv.append(global_inv.loc[np.where(global_inv.Serotype.isin(sero_globalinvadd))]).reset_index().drop(['index'],axis = 1)
-
-# serotypes without any inv get set prior inv appended
-sero_nocountryinv2 = np.setdiff1d(colnames,country_inv.Serotype)
-setinv = np.array([0.0001, 0, 0.0001]) # inv for serotypes without inv estimate
-setinvdf = pd.DataFrame(np.tile(setinv, (len(sero_nocountryinv2),1)), columns = country_inv.columns[1:])
-setinvdf['Serotype'] = sero_nocountryinv2
-country_inv = country_inv.append(setinvdf).reset_index().drop(['index'],axis = 1)
-country_inv.iloc[np.where(country_inv.Serotype == 'NT')[0], 1:4] = 0 # NT has 0 invasiveness
-
-# remove serotypes not in carriage data
-serotypesnotincarrdat = np.setdiff1d(country_inv.Serotype, colnames)
-country_inv = country_inv.drop(np.where(country_inv.Serotype.isin(serotypesnotincarrdat))[0])
-
-# set up df to get disease incidence from invasiveness
-sim_output = pd.DataFrame({'key':sim_output.index, 'value':sim_output.values})
-seroprev = sim_output.drop([0, num_sero+1])
-seroprev = seroprev.rename(columns = {'key': 'Serotype', 'value': 'carrprev'})
-seroprev['carrprev'] = seroprev['carrprev']/indivs
-
-### DISEASE INCIDENCE USING INVASIVENESS
-disinc = seroprev.merge(country_inv, on = 'Serotype')
-disease_cas = disinc['carrprev']*disinc['invasiveness']*(t/365)*indivs #by serotype only
-disinc['disease'] = disease_cas/100000
-
-index_children = np.where(carriers.age <= 6205)[0]
-index_adults = np.where((carriers.age > 6205) & (carriers.age <= 23360))[0]
-index_elderly = np.where(carriers.age > 23360)[0]
-
-pop_child = len(index_children)
-pop_adult = len(index_adults)
-pop_elder = len(index_elderly)
-
-# Carriage by serotype and age group
-carrprevchildsero = np.array(carriers[agegroup == 0].iloc[:,0:num_sero].sum(axis = 0))/pop_child
-carrprevadultsero = np.array(carriers[agegroup == 1].iloc[:,0:num_sero].sum(axis = 0))/pop_adult
-carrpreveldersero = np.array(carriers[agegroup == 2].iloc[:,0:num_sero].sum(axis = 0))/pop_elder
-
-disinc['carrprevchild'] = carrprevchildsero
-disinc['carrprevadult'] = carrprevadultsero
-disinc['carrprevelder'] = carrpreveldersero
-
-# disease cases by age group and serotype
-disease_child = round(disinc['carrprevchild']*disinc['invasiveness']*(t/365)*pop_child)
-disease_adult = round(disinc['carrprevadult']*disinc['invasiveness']*(t/365)*pop_adult)
-disease_elder = round(disinc['carrprevelder']*disinc['invasiveness']*(t/365)*pop_elder)
-
-# save to file destination:
-newfiledest = filedest + endstring + "disinc" + ".csv"
-disinc.to_csv(path_or_buf= newfiledest, index = True)
-
-# overall IPD incidence by age group
-overalldischild = sum(disease_child)/(pop_child*(t/365))*100000
-overalldisadult = sum(disease_adult)/(pop_adult*(t/365))*100000
-overalldiselder = sum(disease_elder)/(pop_elder*(t/365))*100000
-
-# overall carr prev by age group
-overallcarrprevchild = carriers[agegroup == 0].iloc[:,0:num_sero].sum().sum()/pop_child #.605
-overallcarrprevadult = carriers[agegroup == 1].iloc[:,0:num_sero].sum().sum()/pop_adult #.607
-overallcarrprevelder = carriers[agegroup == 2].iloc[:,0:num_sero].sum().sum()/pop_elder #.5
-
-agegrpstats = np.array([[overallcarrprevchild, overallcarrprevadult, overallcarrprevelder],
-                        [overalldischild, overalldisadult, overalldiselder]])
-
-agegrpstats = pd.DataFrame(agegrpstats, columns = ['child', 'adult', 'elder'], index = ['carrprev', 'disease inc'])
-
-newfiledest = filedest + endstring + "agegrpstats" + ".csv"
-agegrpstats.to_csv(path_or_buf= newfiledest, index = True)
-
-### Top 13 disease-causing serotypes get vaccinated against
-top13 = np.array(disinc.disease)[np.argsort(disinc.disease)][-13:]
-top_ind = np.isin(disinc.disease, top13)
-vt = disinc.loc[top_ind].Serotype
-vt_ind = np.where(np.isin(colnames, vt))[0]
-
 vacc_stop_t = t + 1825 # current time + 20 years
 
 # outputs for graph of time vs infected ppl
@@ -552,8 +509,9 @@ plotsy2.insert(loc = 0, column = 'time', value = np.nan)
 
 next_ev = 1
 start2 = time.time()
+
 #while t <= vacc_stop_t and tot_lambda1 != 0:
-for t in range(t, vacc_stop_t + 1):
+for t in range(t+1, vacc_stop_t + 1):
     
     if len(np.where(carriers.age > 36500)[0]) > 0:
         ind_to_die = np.where(carriers.age > 36500)[0]
@@ -635,84 +593,23 @@ for t in range(t, vacc_stop_t + 1):
                 ind_lambdas.iloc[s,j] = (1/np.random.gamma(shape = alpha, scale = (A*np.exp(-prevcol*B))/alpha))                
     
     # tot.lambda = total rate of all/any events
-    i = list(range(numindivspertime)) #0
+    i = 0
     U0 = np.random.uniform(0,1, size = numindivspertime)#20)
     U3 = np.random.uniform(0,1, size = numindivspertime)
-    
-#     # testing multiprocessing TBDDDDDD
-#     def process_updateindivs(i):
-#         
-#         # stackexchange example
-#         #sci=fits.open('{}.fits'.format(name))
-#         #<process>
-#         
-#         tot_lambda1 = ind_lambdas.sum().sum()
-#         #print(tot_lambda1)
-#         U1 = U0[{}.format(i)]
-#         U1_tot_lambda1 = U1*tot_lambda1
-#         
-#         # choose person index ( = which person will this happen to?)
-#         cumsum_person = ind_lambdas.sum(axis = 1)
-#         which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
-#         #try:
-#         #    which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
-#         #except IndexError:
-#         #    which_person = np.where(np.random.uniform(0,1)*ind_lambdas.sum().sum() < np.cumsum(cumsum_person))[0][0]#which_person = indivs - 1 #
-#         #    break
-#         #print(which_person)
-#         
-#         # choose event that will take place (= which serotype will be toggled?)
-#         person_lambdas = new_lambdas(carriers.loc[which_person], ind_lambdas.loc[which_person], prev_col.loc[which_person], sigma)
-#             
-#         if np.any(person_lambdas < 0):
-#             print('NEGATIVE IND_LAMBDA')
-#             print("indiv:", which_person)
-#             print("carr status:", carriers.iloc[which_person, np.where(person_lambdas < 0)[0][0]])
-#             print("serotype:", colnames[np.where(person_lambdas < 0)])
-#             print("prevcol:",prev_col.iloc[which_person, np.where(person_lambdas < 0)[0][0]])
-#             #break
-#         tot_lambda2 = sum(person_lambdas)
-#         U2 = U3[{}.format(i)]
-#         U2_tot_lambda2 = U2*tot_lambda2
-# 
-#         which_indices = np.where(U2_tot_lambda2 < np.cumsum(person_lambdas))
-#         
-#         # switching event (S --> I or I --> S)
-#         if which_indices[0].size > 0:
-#             which_sero = which_indices[0][0]
-#             carriers.iloc[which_person, which_sero] = ~carriers.iloc[which_person, which_sero] + 2        
-# 
-#         #print(which_sero)
-#         # reupdate the susc score
-#         new_susc = max_carr_cap - sum(carriers.iloc[which_person, 0:num_sero])
-#     
-#         # update colonisation history if person acquired new serotype unless person is elderly  
-#         if (new_susc < carriers.susc.loc[which_person]) & (carriers.age.loc[which_person] <= 23360): 
-#             prev_col.iloc[which_person, which_sero] = prev_col.iloc[which_person, which_sero] + 1
-#             
-#         carriers.loc[carriers.index == which_person,'susc'] = new_susc
-#         
-#         #<process>
-#         
-#     if __name__ == '__main__':
-#         pool = Pool()                         # Create a multiprocessing Pool
-#         pool.map(process_updateindivs, i)  # process data_inputs iterable with pool
-        
-     #while i < numindivspertime:#20: # update 50 individuals each time step
+    #while i < numindivspertime:#20: # update 50 individuals each time step
     for i in range(numindivspertime):
-         
         tot_lambda1 = ind_lambdas.sum().sum()
         #print(tot_lambda1)
         U1 = U0[i]
         U1_tot_lambda1 = U1*tot_lambda1
-         
+        
         # choose person index ( = which person will this happen to?)
         cumsum_person = ind_lambdas.sum(axis = 1)
         which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
-         
+        
         # choose event that will take place (= which serotype will be toggled?)
         person_lambdas = new_lambdas2(carriers.loc[which_person], ind_lambdas.loc[which_person], prev_col.loc[which_person], sigma)
-             
+            
         if np.any(person_lambdas < 0):
             print('NEGATIVE IND_LAMBDA')
             print("indiv:", which_person)
@@ -723,22 +620,22 @@ for t in range(t, vacc_stop_t + 1):
         tot_lambda2 = sum(person_lambdas)
         U2 = U3[i]
         U2_tot_lambda2 = U2*tot_lambda2
- 
+
         which_indices = np.where(U2_tot_lambda2 < np.cumsum(person_lambdas))
-         
+        
         # switching event (S --> I or I --> S)
         if which_indices[0].size > 0:
             which_sero = which_indices[0][0]
             carriers.iloc[which_person, which_sero] = ~carriers.iloc[which_person, which_sero] + 2        
- 
+
         #print(which_sero)
         # reupdate the susc score
         new_susc = max_carr_cap - sum(carriers.iloc[which_person, 0:num_sero])
-     
+    
         # update colonisation history if person acquired new serotype    
         if new_susc < carriers.susc.loc[which_person]:
             prev_col.iloc[which_person, which_sero] = prev_col.iloc[which_person, which_sero] + 1
-             
+            
         carriers.loc[carriers.index == which_person,'susc'] = new_susc
         #i += 1
 
@@ -758,7 +655,7 @@ sim_output2 = plotsy2.loc[len(plotsy2) - 1]
 sim_output2['sim_time'] = total_time2/3600
 
 phase = 'postvacc'
-endstring = "simulation" + str(simnum) + "_" + phase + "_" + country + '_'
+endstring = "simulation" + str(simnum) + "_" + phase + "_" + country + "_"
 
 newfiledest2 = filedest + endstring + "output" + ".csv"
 sim_output2.to_csv(path_or_buf= newfiledest2, index = True)
@@ -833,17 +730,6 @@ agegrpstats2.to_csv(path_or_buf= newfiledest, index = True)
 ############# PART 3: POST-VACCINATION PERIOD 2 - extension of PCV ##############################################################################################
 #################################################################################################################################################################
 
-### Top 13 disease-causing serotypes get vaccinated against
-top7add = np.array(disinc2.disease)[np.argsort(disinc2.disease)][-20:-13]
-new_vt = np.array(disinc2.Serotype)[np.argsort(disinc2.disease)][-20:-13]
-new_vt_ind = np.where(np.isin(colnames, new_vt))[0]
-
-# print VT into dataframe
-vt_csv =  filedest + endstring + "VTsero" + ".csv"
-d = dict(vt_1 = vt, vt_2 = new_vt)  
-vtdf = pd.DataFrame(dict([(k,pd.Series(v)) for k,v in d.items() ])) 
-vtdf.to_csv(path_or_buf = vt_csv, index = False)
-
 vt = np.concatenate((vt, new_vt))
 vt_ind = np.concatenate((vt_ind, new_vt_ind))
 
@@ -857,7 +743,7 @@ plotsy3.insert(loc = 0, column = 'time', value = np.nan)
 next_ev = 1
 start3 = time.time()
 #while t <= vacc2_stop_t and tot_lambda1 != 0:
-for t in range(t, vacc2_stop_t+1):
+for t in range(t+1, vacc2_stop_t+1):
     
     if len(np.where(carriers.age > 36500)[0]) > 0:
         ind_to_die = np.where(carriers.age > 36500)[0]
@@ -939,81 +825,23 @@ for t in range(t, vacc2_stop_t+1):
                 ind_lambdas.iloc[s,j] = (1/np.random.gamma(shape = alpha, scale = (A*np.exp(-prevcol*B))/alpha))                
     
     # tot.lambda = total rate of all/any events
-    
-    i = list(range(numindivspertime)) #0
-    U0 = np.random.uniform(0,1, size = numindivspertime)#20)
-    U3 = np.random.uniform(0,1, size = numindivspertime)
-    
-#     # testing multiprocessing TBDDDDDD
-#     def process_updateindivs(i):
-#         
-#         tot_lambda1 = ind_lambdas.sum().sum()
-#         #print(tot_lambda1)
-#         U1 = U0[{}.format(i)]
-#         U1_tot_lambda1 = U1*tot_lambda1
-#         
-#         # choose person index ( = which person will this happen to?)
-#         cumsum_person = ind_lambdas.sum(axis = 1)
-#         which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
-#         #try:
-#         #    which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
-#         #except IndexError:
-#         #    which_person = np.where(np.random.uniform(0,1)*ind_lambdas.sum().sum() < np.cumsum(cumsum_person))[0][0]#which_person = indivs - 1 #
-#         #    break
-#         #print(which_person)
-#         
-#         # choose event that will take place (= which serotype will be toggled?)
-#         person_lambdas = new_lambdas(carriers.loc[which_person], ind_lambdas.loc[which_person], prev_col.loc[which_person], sigma)
-#             
-#         if np.any(person_lambdas < 0):
-#             print('NEGATIVE IND_LAMBDA')
-#             print("indiv:", which_person)
-#             print("carr status:", carriers.iloc[which_person, np.where(person_lambdas < 0)[0][0]])
-#             print("serotype:", colnames[np.where(person_lambdas < 0)])
-#             print("prevcol:",prev_col.iloc[which_person, np.where(person_lambdas < 0)[0][0]])
-#             #break
-#         tot_lambda2 = sum(person_lambdas)
-#         U2 = U3[{}.format(i)]
-#         U2_tot_lambda2 = U2*tot_lambda2
-# 
-#         which_indices = np.where(U2_tot_lambda2 < np.cumsum(person_lambdas))
-#         
-#         # switching event (S --> I or I --> S)
-#         if which_indices[0].size > 0:
-#             which_sero = which_indices[0][0]
-#             carriers.iloc[which_person, which_sero] = ~carriers.iloc[which_person, which_sero] + 2        
-# 
-#         #print(which_sero)
-#         # reupdate the susc score
-#         new_susc = max_carr_cap - sum(carriers.iloc[which_person, 0:num_sero])
-#     
-#         # update colonisation history if person acquired new serotype unless person is elderly  
-#         if (new_susc < carriers.susc.loc[which_person]) & (carriers.age.loc[which_person] <= 23360): 
-#             prev_col.iloc[which_person, which_sero] = prev_col.iloc[which_person, which_sero] + 1
-#             
-#         carriers.loc[carriers.index == which_person,'susc'] = new_susc
-#         
-#         #<process>
-#         
-#     if __name__ == '__main__':
-#         pool = Pool()                         # Create a multiprocessing Pool
-#         pool.map(process_updateindivs, i)  # process data_inputs iterable with pool
-        
-        
+    #i = 0
+    U0 = np.random.uniform(0,1, size = numindivspertime) #20)
+    U3 = np.random.uniform(0,1, size = numindivspertime) #20)
     #while i < numindivspertime: #20: # update 20 individuals each time step
     for i in range(numindivspertime):
         tot_lambda1 = ind_lambdas.sum().sum()
         #print(tot_lambda1)
         U1 = U0[i]
         U1_tot_lambda1 = U1*tot_lambda1
-         
+        
         # choose person index ( = which person will this happen to?)
         cumsum_person = ind_lambdas.sum(axis = 1)
         which_person = np.where(U1_tot_lambda1 < np.cumsum(cumsum_person))[0][0]
-         
+        
         # choose event that will take place (= which serotype will be toggled?)
         person_lambdas = new_lambdas2(carriers.loc[which_person], ind_lambdas.loc[which_person], prev_col.loc[which_person], sigma)
-             
+            
         if np.any(person_lambdas < 0):
             print('NEGATIVE IND_LAMBDA')
             print("indiv:", which_person)
@@ -1024,22 +852,22 @@ for t in range(t, vacc2_stop_t+1):
         tot_lambda2 = sum(person_lambdas)
         U2 = U3[i]
         U2_tot_lambda2 = U2*tot_lambda2
- 
+
         which_indices = np.where(U2_tot_lambda2 < np.cumsum(person_lambdas))
-         
+        
         # switching event (S --> I or I --> S)
         if which_indices[0].size > 0:
             which_sero = which_indices[0][0]
             carriers.iloc[which_person, which_sero] = ~carriers.iloc[which_person, which_sero] + 2        
- 
+
         #print(which_sero)
         # reupdate the susc score
         new_susc = max_carr_cap - sum(carriers.iloc[which_person, 0:num_sero])
-     
+    
         # update colonisation history if person acquired new serotype    
         if new_susc < carriers.susc.loc[which_person]:
             prev_col.iloc[which_person, which_sero] = prev_col.iloc[which_person, which_sero] + 1
-             
+            
         carriers.loc[carriers.index == which_person,'susc'] = new_susc
         #i += 1
 
@@ -1059,7 +887,7 @@ sim_output3 = plotsy3.loc[len(plotsy3) - 1]
 sim_output3['sim_time'] = total_time3/3600
 
 phase = 'postvacc_extendedPCV'
-endstring = 'simulation' + str(simnum) + "_" + phase + "_" + country + "_"
+endstring = "simulation" + str(simnum) + "_" + phase + "_" + country + "_"
 
 newfiledest3 = filedest + endstring + "output" + ".csv"
 sim_output3.to_csv(path_or_buf= newfiledest3, index = True)
