@@ -10,6 +10,7 @@ import time
 import glob
 import os
 from builtins import dict
+from pneumo_IBM_disinc import disease_adult, disease_elder
 
 #import matplotlib
 #import matplotlib.pyplot as plt
@@ -17,7 +18,7 @@ from builtins import dict
 # import parameters
 modparams = pd.read_csv(r"//qdrive.dide.ic.ac.uk/homes/al817/Technical/Python/modparams.csv")
 country = modparams.country[0]
-globalinv = False
+globalinv = True
 indivs = modparams.indivs[0]
 sigma = modparams.sigma[0] # specific immunity
 epsilon = modparams.epsilon[0] # non-specific immunity
@@ -29,7 +30,7 @@ beta = modparams.beta[0] # transmission coefficient
 
 # ## Scenario analysis params
 # country = "fra"
-# globalinv = False
+# globalinv = True
 # indivs = 1000
 # sigma = 0.6 # specific immunity
 # epsilon = 0.25 # non-specific immunity
@@ -112,7 +113,7 @@ if country == "usa":
     country_inv = pd.read_csv(r"//qdrive.dide.ic.ac.uk/homes/al817/Technical/Python/usalocalinv.csv")
 if country == "fi":
     country_inv = pd.read_csv(r"//qdrive.dide.ic.ac.uk/homes/al817/Technical/Python/finlandlocalinv.csv")
-if country == "fra":
+else:
     country_inv = pd.read_csv(r"//qdrive.dide.ic.ac.uk/homes/al817/Technical/Python/fralocalinv.csv")
 
 # PCV13
@@ -151,7 +152,7 @@ if globalinv == True:
     vt_ind = np.where(np.isin(colnames, vt))[0]
     # PCV20
     PCV20df = global_inv[global_inv['Serotype'].isin(vt) == False]
-    new_vt = np.array(PCV20df.nlargest(10, 'invasiveness').Serotype)
+    new_vt = np.array(PCV20df.nlargest(7, 'invasiveness').Serotype)
     new_vt_ind = np.where(np.isin(colnames, new_vt))[0]
     # PCV30
     PCV30df = PCV20df[PCV20df['Serotype'].isin(new_vt) == False]
@@ -250,10 +251,10 @@ contact_matrix_usa = np.array([[1.9157895,  6.348054, 0.3648945],
                                [0.4649120, 11.308140, 0.9242947],
                                [0.1307877,  4.523555, 1.7142857]])
 
-# # # Taken from Melegaro, Gay and Medley (2004)
-# beta_matrix = np.array([[0.047, 0.106, 0.106],
-#                         [0.005, 0.048, 0.005],
-#                         [0.005, 0.005, 0.0488]])
+# # Taken from Melegaro, Gay and Medley (2004)
+beta_matrix = np.array([[0.047, 0.106, 0.106],
+                        [0.005, 0.048, 0.005],
+                        [0.005, 0.005, 0.0488]])
 
 
 if country == 'usa':
@@ -264,7 +265,7 @@ if country == 'fi':
     contact_matrix = contact_matrix_fi
     maxage = 79.9 # life expectancy 79.9 years (2010) https://datacatalog.worldbank.org/dataset/world-development-indicators 
     pop_breakdown = [0.05, 0.77, 0.18] # pop breakdown from UN
-if country == 'fra':
+else:
     contact_matrix = contact_matrix_fr
     maxage = 81.7 # life expectancy 81.7 years (2010) https://datacatalog.worldbank.org/dataset/world-development-indicators 
     pop_breakdown = [0.06, 0.77, 0.17] # pop breakdown from UN
@@ -331,13 +332,12 @@ carriers = carriers_all.copy(deep = True)
 # B_rates_child_val = 0.021#[0.012/indivs]*num_sero # per day
 # B_rates_adult_val = 0.0063 # children are 70% of FOI so adult FOI is reduced by this amount #[0.004/indivs]*num_sero # per day
 # B_rates_elder_val = 0.021#[0.012/indivs]*num_sero # per day
-# B_rates_child_val = 0.021 #[0.012/indivs]*num_sero # per day
-# B_rates_adult_val = 0.0063 # children are 70% of FOI so adult FOI is reduced by this amount #[0.004/indivs]*num_sero # per day
-# B_rates_elder_val = 0.021 #[0.012/indivs]*num_sero # per day
-
-seroparams['beta_child'] = beta #0.00012075 #0.00010169
-seroparams['beta_adult'] = beta #0.00012075 #0.00010169
-seroparams['beta_elder'] = beta #0.00012075 #0.00010169
+B_rates_child_val = 0.021 #[0.012/indivs]*num_sero # per day
+B_rates_adult_val = 0.0063 # children are 70% of FOI so adult FOI is reduced by this amount #[0.004/indivs]*num_sero # per day
+B_rates_elder_val = 0.021#[0.012/indivs]*num_sero # per day
+seroparams['beta_child'] = beta # 0.00010169#0.012 #0.021 #B_rates_child_val
+seroparams['beta_adult'] = beta # 0.00010169#0.012 #0.021 #B_rates_adult_val
+seroparams['beta_elder'] = beta # 0.00010169#0.012 #0.021 #B_rates_elder_val
 
 # index of children and sum of all children, adult and elderly carriers
 index_children = np.where(carriers.age < age_breakdown[0])[0]
@@ -383,16 +383,16 @@ for s in range(indivs):
             ind_lambdas.iloc[s,j] = (1/np.random.gamma(shape = alpha, scale = (A*np.exp(-prevcol*B))/alpha))
 
 #### IMMUNITY AND COMPETITION PARAMS taken from Cobey & Lipsitch
-# sigma = 0.4 # specific immunity
-# epsilon = 0.1 # non-specific immunity
-# theta = 0.1 #0.01 # competition
+#sigma = 0.4 # specific immunity
+#epsilon = 0.1 # non-specific immunity
+#theta = 0.01 # competition
 #mincarrdur = 5 # minimum carriage duration
 
 # vaccine params
 vacc_start = 7300 # start of vaccination period
-# vacc_dur = 10 # years of vaccine-induced protection
+#vacc_dur = 10 # years of vaccine-induced protection
 vacc_dur = vacc_dur*365 # protection converted to days 
-# vacc_eff = 0.95
+#vacc_eff = 1
 
 # log file of main params
 paramlogfile = dict(simnum = max(filenums) + 1, country = country, beta = seroparams['beta_child'][0], indivs = indivs, vacc_dur = vacc_dur, vacc_eff = vacc_eff,
@@ -507,6 +507,7 @@ for t in range(stop_t+1):
         carriers.loc[carriers.index == which_person,'susc'] = new_susc
         
     # migration: add 1 carrier to serotypes with zero carriers
+    # migration: add 1 carrier to serotypes with zero carriers
     extinctsero = np.where(carriers.iloc[:,0:num_sero].sum(axis = 0) == 0)[0]
     
     #extinctsero_child = np.where(carriers.iloc[index_children,0:num_sero].sum(axis = 0) == 0)[0]
@@ -607,9 +608,9 @@ pop_adult = len(index_adults)
 pop_elder = len(index_elderly)
 
 # Carriage by serotype
-carrprevchildsero = np.array(carriers[carriers.agegroup== 0].iloc[:,0:num_sero].sum(axis = 0))/pop_child
-carrprevadultsero = np.array(carriers[carriers.agegroup== 1].iloc[:,0:num_sero].sum(axis = 0))/pop_adult
-carrpreveldersero = np.array(carriers[carriers.agegroup== 2].iloc[:,0:num_sero].sum(axis = 0))/pop_elder
+carrprevchildsero = np.array(carriers[carriers.agegroup == 0].iloc[:,0:num_sero].sum(axis = 0))/pop_child
+carrprevadultsero = np.array(carriers[carriers.agegroup == 1].iloc[:,0:num_sero].sum(axis = 0))/pop_adult
+carrpreveldersero = np.array(carriers[carriers.agegroup == 2].iloc[:,0:num_sero].sum(axis = 0))/pop_elder
 
 disinc['carrprevchild'] = carrprevchildsero
 disinc['carrprevadult'] = carrprevadultsero
@@ -631,16 +632,12 @@ overalldisadult = (sum(disease_adult)/(pop_adult*(t/365)))*100000
 overalldiselder = (sum(disease_elder)/(pop_elder*(t/365)))*100000
 
 overallcarrprev = len(np.where(carriers.susc < max_carr_cap)[0])/indivs
-overallcarrprevchild = len(np.where(carriers.susc[agegroup == 0] < max_carr_cap)[0])/pop_child
-overallcarrprevadult = len(np.where(carriers.susc[agegroup == 1] < max_carr_cap)[0])/pop_adult
-overallcarrprevelder = len(np.where(carriers.susc[agegroup == 2] < max_carr_cap)[0])/pop_elder
-
-overallcarrprevchild = (carriers[carriers.agegroup== 0].susc < max_carr_cap).sum()/pop_child
-overallcarrprevadult = (carriers[carriers.agegroup== 1].susc < max_carr_cap).sum()/pop_adult
-overallcarrprevelder = (carriers[carriers.agegroup== 2].susc < max_carr_cap).sum()/pop_elder
-# overallcarrprevchild = len(np.where(carriers[carriers.agegroup== 0].susc < max_carr_cap)[0])/pop_child
-# overallcarrprevadult = len(np.where(carriers[carriers.agegroup== 1].susc < max_carr_cap)[0])/pop_adult
-# overallcarrprevelder = len(np.where(carriers[carriers.agegroup== 2].susc < max_carr_cap)[0])/pop_elder
+overallcarrprevchild = len(np.where(carriers[carriers.agegroup == 0].susc < max_carr_cap)[0])/pop_child
+overallcarrprevadult = len(np.where(carriers[carriers.agegroup == 1].susc < max_carr_cap)[0])/pop_adult
+overallcarrprevelder = len(np.where(carriers[carriers.agegroup == 2].susc < max_carr_cap)[0])/pop_elder
+# overallcarrprevchild = len(np.where(carriers[carriers.agegroup == 0].susc < max_carr_cap)[0])/pop_child
+# overallcarrprevadult = len(np.where(carriers[carriers.agegroup == 1].susc < max_carr_cap)[0])/pop_adult
+# overallcarrprevelder = len(np.where(carriers[carriers.agegroup == 2].susc < max_carr_cap)[0])/pop_elder
 
 agegrpstats = np.array([[overallcarrprev, overallcarrprevchild, overallcarrprevadult, overallcarrprevelder],
                         [overalldis, overalldischild, overalldisadult, overalldiselder]])
@@ -840,7 +837,6 @@ end2 = time.time()
 total_time2 = end2 - start2
 plotsy2 = plotsy2.dropna()
 plotsy_melt2= pd.melt(plotsy2, id_vars = 'time')
-
 plot2 = plotsy_melt2.pivot_table('value', 'time', 'variable', aggfunc='mean').plot(kind='line')
 
 # output file
@@ -890,9 +886,9 @@ disinc2['disease_cas'] = disease_cas2
 disinc2['disease_inc'] = (disease_cas2/indivs)*100000 # overall disease incidence by serotype (regardless of age group)
 
 # carriage prevalence by serotype and age grp
-carrprevchildsero2 = np.array(carriers[carriers.agegroup== 0].iloc[:,0:num_sero].sum(axis = 0))/pop_child
-carrprevadultsero2 = np.array(carriers[carriers.agegroup== 1].iloc[:,0:num_sero].sum(axis = 0))/pop_adult
-carrpreveldersero2 = np.array(carriers[carriers.agegroup== 2].iloc[:,0:num_sero].sum(axis = 0))/pop_elder
+carrprevchildsero2 = np.array(carriers[carriers.agegroup == 0].iloc[:,0:num_sero].sum(axis = 0))/pop_child
+carrprevadultsero2 = np.array(carriers[carriers.agegroup == 1].iloc[:,0:num_sero].sum(axis = 0))/pop_adult
+carrpreveldersero2 = np.array(carriers[carriers.agegroup == 2].iloc[:,0:num_sero].sum(axis = 0))/pop_elder
 
 disinc2['carrprevchild'] = carrprevchildsero2
 disinc2['carrprevadult'] = carrprevadultsero2
@@ -914,9 +910,9 @@ overalldisadult2 = (sum(disease_adult2)/(pop_adult*(tprime/365)))*100000
 overalldiselder2 = (sum(disease_elder2)/(pop_elder*(tprime/365)))*100000
 
 overallcarrprev2 = len(np.where(carriers.susc < max_carr_cap)[0])/indivs
-overallcarrprevchild2 = len(np.where(carriers[carriers.agegroup== 0].susc < max_carr_cap)[0])/pop_child
-overallcarrprevadult2 = len(np.where(carriers[carriers.agegroup== 1].susc < max_carr_cap)[0])/pop_adult
-overallcarrprevelder2 = len(np.where(carriers[carriers.agegroup== 2].susc < max_carr_cap)[0])/pop_elder
+overallcarrprevchild2 = len(np.where(carriers[carriers.agegroup == 0].susc < max_carr_cap)[0])/pop_child
+overallcarrprevadult2 = len(np.where(carriers[carriers.agegroup == 1].susc < max_carr_cap)[0])/pop_adult
+overallcarrprevelder2 = len(np.where(carriers[carriers.agegroup == 2].susc < max_carr_cap)[0])/pop_elder
 
 agegrpstats2 = np.array([[overallcarrprev2, overallcarrprevchild2, overallcarrprevadult2, overallcarrprevelder2],
                         [overalldis2, overalldischild2, overalldisadult2, overalldiselder2]])
@@ -1131,9 +1127,9 @@ disinc3['disease_cas'] = disease_cas3
 disinc3['disease_inc'] = (disease_cas3/indivs)*100000
 
 # overall carriage prevalence and IPD by age group
-carrprevchildsero3 = np.array(carriers[carriers.agegroup== 0].iloc[:,0:num_sero].sum(axis = 0))/pop_child
-carrprevadultsero3 = np.array(carriers[carriers.agegroup== 1].iloc[:,0:num_sero].sum(axis = 0))/pop_adult
-carrpreveldersero3 = np.array(carriers[carriers.agegroup== 2].iloc[:,0:num_sero].sum(axis = 0))/pop_elder
+carrprevchildsero3 = np.array(carriers[carriers.agegroup == 0].iloc[:,0:num_sero].sum(axis = 0))/pop_child
+carrprevadultsero3 = np.array(carriers[carriers.agegroup == 1].iloc[:,0:num_sero].sum(axis = 0))/pop_adult
+carrpreveldersero3 = np.array(carriers[carriers.agegroup == 2].iloc[:,0:num_sero].sum(axis = 0))/pop_elder
 
 disinc3['carrprevchild'] = carrprevchildsero3
 disinc3['carrprevadult'] = carrprevadultsero3
@@ -1154,14 +1150,14 @@ overalldischild3 = (sum(disease_child3)/(pop_child*(tprime/365)))*100000
 overalldisadult3 = (sum(disease_adult3)/(pop_adult*(tprime/365)))*100000
 overalldiselder3 = (sum(disease_elder3)/(pop_elder*(tprime/365)))*100000
 
-# overallcarrprevchild3 = carriers[carriers.agegroup== 0].iloc[:,0:num_sero].sum().sum()/pop_child #.605
-# overallcarrprevadult3 = carriers[carriers.agegroup== 1].iloc[:,0:num_sero].sum().sum()/pop_adult #.607
-# overallcarrprevelder3 = carriers[carriers.agegroup== 2].iloc[:,0:num_sero].sum().sum()/pop_elder #.5
+# overallcarrprevchild3 = carriers[carriers.agegroup == 0].iloc[:,0:num_sero].sum().sum()/pop_child #.605
+# overallcarrprevadult3 = carriers[carriers.agegroup == 1].iloc[:,0:num_sero].sum().sum()/pop_adult #.607
+# overallcarrprevelder3 = carriers[carriers.agegroup == 2].iloc[:,0:num_sero].sum().sum()/pop_elder #.5
 
 overallcarrprev3 = len(np.where(carriers.susc < max_carr_cap)[0])/indivs
-overallcarrprevchild3 = len(np.where(carriers[carriers.agegroup== 0].susc < max_carr_cap)[0])/pop_child
-overallcarrprevadult3 = len(np.where(carriers[carriers.agegroup== 1].susc < max_carr_cap)[0])/pop_adult
-overallcarrprevelder3 = len(np.where(carriers[carriers.agegroup== 2].susc < max_carr_cap)[0])/pop_elder
+overallcarrprevchild3 = len(np.where(carriers[carriers.agegroup == 0].susc < max_carr_cap)[0])/pop_child
+overallcarrprevadult3 = len(np.where(carriers[carriers.agegroup == 1].susc < max_carr_cap)[0])/pop_adult
+overallcarrprevelder3 = len(np.where(carriers[carriers.agegroup == 2].susc < max_carr_cap)[0])/pop_elder
 
 agegrpstats3 = np.array([[overallcarrprev3, overallcarrprevchild3, overallcarrprevadult3, overallcarrprevelder3],
                         [overalldis3, overalldischild3, overalldisadult3, overalldiselder3]])
@@ -1336,7 +1332,7 @@ phase = 'postPCV30'
 endstring = "simulation" + str(simnum) + "_" + phase + "_" + country + "_"
 
 plotsy_melt4dest = filedest + endstring + 'carrdt.csv'
-plotsy_melt4.to_csv(path_or_buf= plotsy_melt4dest, index = True)
+plotsy_melt4.to_csv(path_or_buf= plotsy_meltdest, index = True)
 
 newfiledest4 = filedest + endstring + "output" + ".csv"
 sim_output4.to_csv(path_or_buf= newfiledest4, index = True)
