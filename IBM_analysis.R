@@ -121,6 +121,10 @@ IRRfun <- function(foldernam) {
     colnames(x) = c('X', 'carr', 'simnum', 'vaxperiod', 'country', 'description', 'vaxstrat')
     return(x)})
   output <- bind_rows(output_temp2)
+  if (vaxstrat != 'local_inv') {
+    output_prePCV <- output_locinv %>% filter(vaxperiod == 'prevacc')
+    output <<- bind_rows(output_prePCV, output)
+  }
   
   VTserofiles <- grepl('VTsero', temp, fixed = TRUE)
   VTsero_temp <- myfiles[VTserofiles]
@@ -320,6 +324,7 @@ IRRfun <- function(foldernam) {
     agegrpstats_t <- agegrpstats %>% filter(simnum == i)
     disinc_t <- disinc %>% filter(simnum == i)
     carriers_t <- carrierstmax %>% filter(simnum == i)
+    indivs <- 5000
     
     if (nrow(agegrpstats_t) < 16) {
       return()
@@ -337,11 +342,12 @@ IRRfun <- function(foldernam) {
     # disease_adult <- disinc_t1['carrprevadult']*disinc_t1['invasiveness']*(stop_t/365)*pop_adult
     # disease_elder <- disinc_t1['carrprevelder']*disinc_t1['invasiveness']*(stop_t/365)*pop_elder
     
+    disease_overall <- disinc_t1$carrprev*disinc_t1$invasiveness*(stop_t/365)*indivs
     disease_child <- disinc_t1$carrprevchild*disinc_t1$invasiveness*(stop_t/365)*pop_child
     disease_adult <- disinc_t1$carrprevadult*disinc_t1$invasiveness*(stop_t/365)*pop_adult
     disease_elder <- disinc_t1$carrprevelder*disinc_t1$invasiveness*(stop_t/365)*pop_elder
 
-    disease_all <- c(sum(disease_child), sum(disease_adult), sum(disease_elder))
+    disease_all <- c(sum(disease_overall), sum(disease_child), sum(disease_adult), sum(disease_elder))
 
     # postPCV13
     disinc_t2 <- disinc_t %>% filter(vaxperiod == 'postPCV13')
@@ -350,16 +356,13 @@ IRRfun <- function(foldernam) {
     pop_adult2 <- nrow(carriers_t2 %>% filter(agegroup == 1))
     pop_elder2 <- nrow(carriers_t2 %>% filter(agegroup == 2))
     stop_t <- 3650
-
-    # disease_child2 <- disinc_t2['carrprevchild']*disinc_t2['invasiveness']*(stop_t/365)*pop_child2
-    # disease_adult2 <- disinc_t2['carrprevadult']*disinc_t2['invasiveness']*(stop_t/365)*pop_adult2
-    # disease_elder2 <- disinc_t2['carrprevelder']*disinc_t2['invasiveness']*(stop_t/365)*pop_elder2
     
+    disease_overall2 <- disinc_t2$carrprev*disinc_t2$invasiveness*(stop_t/365)*indivs
     disease_child2 <- disinc_t2$carrprevchild*disinc_t2$invasiveness*(stop_t/365)*pop_child2
     disease_adult2 <- disinc_t2$carrprevadult*disinc_t2$invasiveness*(stop_t/365)*pop_adult2
     disease_elder2 <- disinc_t2$carrprevelder*disinc_t2$invasiveness*(stop_t/365)*pop_elder2
 
-    disease_all2 <- c(sum(disease_child2), sum(disease_adult2), sum(disease_elder2))
+    disease_all2 <- c(sum(disease_overall2), sum(disease_child2), sum(disease_adult2), sum(disease_elder2))
 
     # postPCV20
     disinc_t3 <- disinc_t %>% filter(vaxperiod == 'postPCV20')
@@ -367,16 +370,13 @@ IRRfun <- function(foldernam) {
     pop_child3 <- nrow(carriers_t3 %>% filter(agegroup == 0))
     pop_adult3 <- nrow(carriers_t3 %>% filter(agegroup == 1))
     pop_elder3 <- nrow(carriers_t3 %>% filter(agegroup == 2))
-
-    # disease_child3 <- disinc_t3['carrprevchild']*disinc_t3['invasiveness']*(stop_t/365)*pop_child3
-    # disease_adult3 <- disinc_t3['carrprevadult']*disinc_t3['invasiveness']*(stop_t/365)*pop_adult3
-    # disease_elder3 <- disinc_t3['carrprevelder']*disinc_t3['invasiveness']*(stop_t/365)*pop_elder3
     
+    disease_overall3 <- disinc_t3$carrprev*disinc_t3$invasiveness*(stop_t/365)*indivs
     disease_child3 <- disinc_t3$carrprevchild*disinc_t3$invasiveness*(stop_t/365)*pop_child3
     disease_adult3 <- disinc_t3$carrprevadult*disinc_t3$invasiveness*(stop_t/365)*pop_adult3
     disease_elder3 <- disinc_t3$carrprevelder*disinc_t3$invasiveness*(stop_t/365)*pop_elder3
 
-    disease_all3 <- c(sum(disease_child3), sum(disease_adult3), sum(disease_elder3))
+    disease_all3 <- c(sum(disease_overall3), sum(disease_child3), sum(disease_adult3), sum(disease_elder3))
 
     # postPCV30
     disinc_t4 <- disinc_t %>% filter(vaxperiod == 'postPCV30')
@@ -385,21 +385,62 @@ IRRfun <- function(foldernam) {
     pop_adult4 <- nrow(carriers_t4 %>% filter(agegroup == 1))
     pop_elder4 <- nrow(carriers_t4 %>% filter(agegroup == 2))
 
-    # disease_child4 <- disinc_t4['carrprevchild']*disinc_t4['invasiveness']*(stop_t/365)*pop_child4
-    # disease_adult4 <- disinc_t4['carrprevadult']*disinc_t4['invasiveness']*(stop_t/365)*pop_adult4
-    # disease_elder4 <- disinc_t4['carrprevelder']*disinc_t4['invasiveness']*(stop_t/365)*pop_elder4
-    
+    disease_overall4 <- disinc_t4$carrprev*disinc_t4$invasiveness*(stop_t/365)*indivs
     disease_child4 <- disinc_t4$carrprevchild*disinc_t4$invasiveness*(stop_t/365)*pop_child4
     disease_adult4 <- disinc_t4$carrprevadult*disinc_t4$invasiveness*(stop_t/365)*pop_adult4
     disease_elder4 <- disinc_t4$carrprevelder*disinc_t4$invasiveness*(stop_t/365)*pop_elder4
 
-    disease_all4 <- c(sum(disease_child4), sum(disease_adult4), sum(disease_elder4))
+    disease_all4 <- c(sum(disease_overall4), sum(disease_child4), sum(disease_adult4), sum(disease_elder4))
 
     sumdisdf <- rbind(disease_all, disease_all2, disease_all3, disease_all4)
-    colnames(sumdisdf) <- c('children', 'adults', 'elder')
+    colnames(sumdisdf) <- c('all','children', 'adults', 'elder')
     rownames(sumdisdf) <- c('prevax', 'postPCV13', 'postPCV20', 'postPCV30')
 
     sumdisdf[sumdisdf == 0] <- 1e-8
+    
+    # all
+    overalldisall <- agegrpstats_t[which(agegrpstats_t$vaxperiod == 'prevacc' &
+                                             agegrpstats_t$X == 'disease inc'),]$overall
+    overalldisall2 <- agegrpstats_t[which(agegrpstats_t$vaxperiod == 'postPCV13' &
+                                              agegrpstats_t$X == 'disease inc'),]$overall
+    overalldisall3 <- agegrpstats_t[which(agegrpstats_t$vaxperiod == 'postPCV20' &
+                                              agegrpstats_t$X == 'disease inc'),]$overall
+    overalldisall4 <- agegrpstats_t[which(agegrpstats_t$vaxperiod == 'postPCV30' &
+                                              agegrpstats_t$X == 'disease inc'),]$overall
+    post13_all <- overalldisall2/overalldisall
+    post20_all <- overalldisall3/overalldisall2
+    post30_all <- overalldisall4/overalldisall3
+    all_all <- overalldisall4/overalldisall
+    IRR_all_v <- c(post13_all, post20_all, post30_all, all_all)
+    
+    # stdev
+    stdev_post13_all <- sqrt((1/sumdisdf['prevax', 'all']) + (1/sumdisdf['postPCV13', 'all']))
+    stdev_post20_all <- sqrt((1/sumdisdf['postPCV13', 'all']) + (1/sumdisdf['postPCV20', 'all']))
+    stdev_post30_all <- sqrt((1/sumdisdf['postPCV20', 'all']) + (1/sumdisdf['postPCV30', 'all']))
+    stdev_all_all <- sqrt((1/sumdisdf['prevax', 'all']) + (1/sumdisdf['postPCV30', 'all']))
+    
+    # bounds 95% CI
+    post13_all_bounds <- c(exp(log(post13_all)-(1.96*stdev_post13_all)),
+                             exp(log(post13_all)+(1.96*stdev_post13_all)))
+    post20_all_bounds <- c(exp(log(post20_all)-(1.96*stdev_post20_all)),
+                             exp(log(post20_all)+(1.96*stdev_post20_all)))
+    post30_all_bounds <- c(exp(log(post30_all)-(1.96*stdev_post30_all)),
+                             exp(log(post30_all)+(1.96*stdev_post30_all)))
+    all_all_bounds <- c(exp(log(all_all)-(1.96*stdev_all_all)),
+                          exp(log(all_all)+(1.96*stdev_all_all)))
+    
+    IRR_bounds_all = rbind(post13_all_bounds, post20_all_bounds, post30_all_bounds, all_all_bounds)
+    colnames(IRR_bounds_all) <- c('low', 'high')
+    rownames(IRR_bounds_all) <- c('post13 vs pre', 'post20 vs post13', 'post30 vs post20', 'post30 vs pre')
+    IRR_all <- data.frame(IRR_bounds_all)
+    IRR_all$IRR <- IRR_all_v
+    IRR_all$agegrp <- 'all'
+    IRR_all$simnum <- i
+    IRR_all$vaxperiod <- 'postPCV30' # irrelevant
+    IRR_all$country <- 'fra'
+    IRR_all$description <- simparams[which(simparams$simnum == i),]$description
+    IRR_all$vaxstrat <- 'local_inv'
+    IRR_all <- tibble::rownames_to_column(IRR_all, var = 'X')
 
     # children
     overalldischild <- agegrpstats_t[which(agegrpstats_t$vaxperiod == 'prevacc' &
@@ -535,7 +576,7 @@ IRRfun <- function(foldernam) {
     IRR_elders$vaxstrat <- 'local_inv'
     IRR_elders <- tibble::rownames_to_column(IRR_elders, var = 'X')
 
-    IRR_full <- bind_rows(IRR_children, IRR_adults, IRR_elders)
+    IRR_full <- bind_rows(IRR_all, IRR_children, IRR_adults, IRR_elders)
     
     return(IRR_full)
     #IRR <- bind_rows(IRR, IRR_full)
@@ -566,23 +607,24 @@ IRRfun <- function(foldernam) {
     agegrpstats_locinv <<- agegrpstats
     disinc_locinv <<- disinc
     carrierstmax_locinv <<- carrierstmax
+    output_locinv <<- output
   }
 
-  IRR_agegrps <- ggplot(IRR) +
-    geom_errorbar(aes(x = X, ymin = low, ymax = high, colour = agegrp, group = agegrp),
-                  width = 0.1, position = position_dodge(width = 0.3)) +
-    geom_point(aes(x = X, y = IRR, colour = agegrp, group = agegrp),
-               position = position_dodge(width = 0.3)) +
-    #scale_y_continuous(trans = 'log10') +
-    scale_color_viridis(discrete = T)
-
-  IRR_description_ch <- ggplot(IRR %>% filter(agegrp == 'children')) +
-    geom_errorbar(aes(x = X, ymin = low, ymax = high, colour = description, group = description),
-                  width = 0.1, position = position_dodge(width = 0.3)) +
-    geom_point(aes(x = X, y = IRR, colour = description, group = description),
-               position = position_dodge(width = 0.3)) +
-    scale_y_continuous(trans = 'log10') +
-    scale_color_viridis(discrete = T)
+  # IRR_agegrps <- ggplot(IRR) +
+  #   geom_errorbar(aes(x = X, ymin = low, ymax = high, colour = agegrp, group = agegrp),
+  #                 width = 0.1, position = position_dodge(width = 0.3)) +
+  #   geom_point(aes(x = X, y = IRR, colour = agegrp, group = agegrp),
+  #              position = position_dodge(width = 0.3)) +
+  #   #scale_y_continuous(trans = 'log10') +
+  #   scale_color_viridis(discrete = T)
+  # 
+  # IRR_description_ch <- ggplot(IRR %>% filter(agegrp == 'children')) +
+  #   geom_errorbar(aes(x = X, ymin = low, ymax = high, colour = description, group = description),
+  #                 width = 0.1, position = position_dodge(width = 0.3)) +
+  #   geom_point(aes(x = X, y = IRR, colour = description, group = description),
+  #              position = position_dodge(width = 0.3)) +
+  #   scale_y_continuous(trans = 'log10') +
+  #   scale_color_viridis(discrete = T)
   
   est_VTcarrprev <- function(i) {#i = simnum;
     #print(paste(i, vaccinperiod, sep = "-"))
@@ -894,6 +936,7 @@ fra_agegrpstats_locinv <- agegrpstats_locinv
 fra_disinc_locinv <- disinc_locinv
 fra_carrierstmax_locinv <- carrierstmax_locinv
 fra_VTcarrprev_locinv <- VTcarrprev2
+fra_output_locinv <- output_locinv
 setwd("Q:/Technical/Python")
 write.csv(fra_inv_meta, 'fra_inv_meta.csv')
 write.csv(fra_IRR_locinv, 'fra_IRR_locinv.csv')
@@ -926,6 +969,7 @@ usa_IRR_locinv <- IRR_locinv
 usa_agegrpstats_locinv <- agegrpstats_locinv
 usa_disinc_locinv <- disinc_locinv
 usa_carrierstmax_locinv <- carrierstmax_locinv
+usa_output_locinv <- output_locinv
 setwd("Q:/Technical/Python")
 write.csv(usa_inv_meta, 'usa_inv_meta.csv')
 write.csv(usa_IRR_locinv, 'usa_IRR_locinv.csv')
@@ -942,9 +986,11 @@ write.csv(usa_dis_VTsero, 'usa_VTsero_dis.csv')
 
 usa_glob_meta <- IRRfun(usa_glob_file)
 usa_glob_agegrpstats <- agegrpstats
+usa_glob_VTcarrprev <- VTcarrprev2
 setwd("Q:/Technical/Python")
 write.csv(usa_glob_meta, 'usa_glob_meta.csv')
 write.csv(usa_glob_agegrpstats, 'usa_agegrpstats_glob.csv')
+write.csv(usa_glob_VTcarrprev, 'usa_VTcarrprev_glob.csv')
 
 ####################################################################################################
 ### VT carriage prevalence analysis
@@ -1192,6 +1238,10 @@ annotate_figure(usa_post30_carrprev_pl, top = text_grob("USA - Post-hPCV30", fac
 ####################################################################################################
 ### Pooled IRR analysis
 ####################################################################################################
+fra_inv_meta <- read.csv('fra_inv_meta.csv')
+fra_dis_meta <- read.csv('fra_dis_meta.csv')
+fra_glob_meta <- read.csv('fra_glob_meta.csv')
+
 fra_meta <- bind_rows(fra_inv_meta, fra_dis_meta, fra_glob_meta)
 fra_meta$vaxstrategy <- factor(fra_meta$vaxstrategy, levels = c('dis_inc', 'local_inv', 'glob_inv'),
                                labels = c('Disease incidence', 'Local invasiveness', 'Global invasiveness'))
@@ -1270,6 +1320,91 @@ IRR_plot2 <- ggarrange(r[[1]], r[[7]], r[[8]], "", r[[3]], r[[4]],
                       ncol = 3, nrow = 2,
                       common.legend = T, legend = 'bottom')
 ggsave(IRR_plot2, file = 'Q:/Technical/Python/figs for paper/fig18_fra_IRR_vax.pdf', height = 10, width = 10)
+
+######### Comparison glob with USA ############
+usa_glob_meta <- read.csv('usa_glob_meta.csv')
+fra_glob_meta$X <- NULL
+
+glob_meta <- bind_rows(fra_glob_meta, usa_glob_meta)%>% select(-random, -random.lo, -random.hi)
+glob_meta2 <- glob_meta %>% pivot_wider(names_from = country, 
+                                        values_from = c(fixed, fixed.lo, fixed.hi))
+
+ggplot(glob_meta2 %>% filter(description == 'Default'), aes(x = fixed_fra, y = fixed_usa, colour = vaxperiod)) +
+  geom_errorbar(aes(ymin = fixed.lo_usa, ymax = fixed.hi_usa)) +
+  geom_errorbarh(aes(xmin = fixed.lo_fra, xmax = fixed.hi_fra)) +
+  geom_point() + labs(colour = "", x = 'France log(Pooled IRR)', y = 'USA log(Pooled IRR)') +
+  scale_color_viridis(discrete = T) +
+  theme_bw()
+
+
+
+usa_VTcarrprev <- usa_glob_VTcarrprev %>% 
+  pivot_longer(cols = c('Pre.hPCV', 'Post.hPCV13', 'Post.hPCV20', 'Post.hPCV30'), 
+               names_to = 'vaxperiod', 
+               values_to = 'carrprev')
+
+usa_VTcarrprev_avg <- usa_VTcarrprev %>% group_by(description, vaxperiod, agegrp, VT, vaxstrat) %>% 
+  summarise(smean = mean(carrprev, na.rm = TRUE),
+            ssd = sd(carrprev, na.rm = TRUE),
+            count = n()) %>%
+  mutate(se = ssd / sqrt(count),
+         lower_ci = lower_ci(smean, se, count),
+         upper_ci = upper_ci(smean, se, count),
+         country = 'usa')
+
+usa_VTcarrprev_avg$vaxperiod <- factor(usa_VTcarrprev_avg$vaxperiod,
+                                       levels = c('Pre.hPCV', 'Post.hPCV13', 'Post.hPCV20', 'Post.hPCV30'),
+                                       labels = c('Pre-hPCV', 'Post-hPCV13', 'Post-hPCV20', 'Post-hPCV30'))
+usa_VTcarrprev_avg$agegrp <- factor(usa_VTcarrprev_avg$agegrp,
+                                    levels = c('All', 'Children', 'Adults', 'Elderly'))
+usa_VTcarrprev_avg$vaxstrat <- factor(usa_VTcarrprev_avg$vaxstrat,
+                                      levels = c('dis_inc', 'local_inv', 'glob_inv'),
+                                      labels = c('Disease incidence', 'Local invasiveness', 'Global invasiveness'))
+usa_VTcarrprev_avg$lower_ci[which(usa_VTcarrprev_avg$lower_ci < 0)] <- 0
+
+# function to plot VT carriage over vax periods                                       
+plot_vtcarr <- function(agegroup, vaxstrategy) {
+  ggplot(usa_VTcarrprev_avg %>% filter(description == 'default5k', agegrp == agegroup, vaxstrat == vaxstrategy), 
+         aes(group = vaxperiod)) + 
+    geom_errorbar(aes(x = VT, 
+                      ymin = lower_ci*100, 
+                      ymax = upper_ci*100, 
+                      colour = vaxperiod), 
+                  width = 0.1, position = position_dodge(0.3)) + 
+    geom_point(aes(x = VT, y = smean*100, colour = vaxperiod), 
+               position = position_dodge(0.3)) + 
+    labs(x = "", y = 'Carriage prevalence (%)', colour = "") + 
+    theme_bw() + theme_minimal() + ggtitle(vaxstrategy) + 
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    scale_color_viridis(discrete = T)
+}
+
+fra_inv_VTcarrpl <- lapply(unique(fra_VTcarrprev_avg$agegrp), 
+                           function(x) {plot_vtcarr(agegroup = x, vaxstrategy = 'Local invasiveness')})
+fra_dis_VTcarrpl <- lapply(unique(fra_VTcarrprev_avg$agegrp), 
+                           function(x) {plot_vtcarr(x, 'Disease incidence')})
+fra_glob_VTcarrpl <- lapply(unique(fra_VTcarrprev_avg$agegrp), function(x) {plot_vtcarr(x, 'Global invasiveness')})
+
+### pdf 3 x 8
+adults_vtcarrpl <- ggarrange(fra_dis_VTcarrpl[[1]], fra_inv_VTcarrpl[[1]], fra_glob_VTcarrpl[[1]],
+                             nrow = 1, ncol = 3, common.legend = T, legend = 'bottom')
+all_vtcarrpl <- ggarrange(fra_dis_VTcarrpl[[2]], fra_inv_VTcarrpl[[2]], fra_glob_VTcarrpl[[2]],
+                          nrow = 1, ncol = 3, common.legend = T, legend = 'bottom')
+ch_vtcarrpl <- ggarrange(fra_dis_VTcarrpl[[3]], fra_inv_VTcarrpl[[3]], fra_glob_VTcarrpl[[3]],
+                         nrow = 1, ncol = 3, common.legend = T, legend = 'bottom')
+eld_vtcarrpl <- ggarrange(fra_dis_VTcarrpl[[4]], fra_inv_VTcarrpl[[4]], fra_glob_VTcarrpl[[4]],
+                          nrow = 1, ncol = 3, common.legend = T, legend = 'bottom')
+
+### cleaner facet grid
+usa_VTcarr_facet <- ggplot(usa_VTcarrprev_avg %>% filter(description == 'default5k')) + 
+  geom_errorbar(aes(x = VT, ymin = lower_ci*100, ymax = upper_ci*100, 
+                    colour = vaxperiod), width = 0.1, position = position_dodge(0.3)) + 
+  geom_point(aes(x = VT, y = smean*100, colour = vaxperiod), 
+             position = position_dodge(0.3)) + 
+  labs(x = "", y = 'Carriage prevalence (%)', colour = "") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+  scale_color_viridis(discrete = T) + facet_grid(rows = vars(agegrp))
 
 
 ####################################################################################################
